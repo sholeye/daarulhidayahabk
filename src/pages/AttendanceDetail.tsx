@@ -126,7 +126,7 @@ const AttendanceDetail: React.FC = () => {
                   />
                 ) : (
                   <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
-                    No selfie uploadedd
+                    No selfie uploaded
                   </div>
                 )}
               </div>
