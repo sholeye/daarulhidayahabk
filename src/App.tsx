@@ -44,7 +44,7 @@ import { AdminQuizPage } from "@/features/admin/AdminQuizPage";
 import { AdminBlogPage } from "@/features/admin/AdminBlogPage";
 import { AssignmentsPage } from "@/features/admin/AssignmentsPage";
 
-// Learner
+// Learner //
 import { LearnerLayout } from "@/features/learner/LearnerLayout";
 import { LearnerDashboard } from "@/features/learner/LearnerDashboard";
 import { LearnerProfile } from "@/features/learner/LearnerProfile";
