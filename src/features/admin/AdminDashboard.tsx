@@ -18,6 +18,8 @@ import {
   formatCurrency,
   formatDate,
   getOutstandingBalance,
+  getFeeStatus,
+  getTermAmountPaid,
 } from "@/utils/helpers";
 import { Badge } from "@/components/ui/badge";
 import { InlineLoader } from "@/components/ui/page-loader";
@@ -42,7 +44,15 @@ export const AdminDashboard: React.FC = () => {
   const selectedTerm = academicTerms.find((term) => term.id === selectedTermId);
 
   const totalStudents = students.length;
-  const paidStudents = students.filter((s) => s.feeStatus === "paid").length;
+  const paidStudents = selectedTerm
+    ? students.filter(
+        (student) =>
+          getFeeStatus(
+            getTermAmountPaid(payments, student.studentId, selectedTerm),
+            selectedTerm.fee,
+          ) === "paid",
+      ).length
+    : 0;
   const totalRevenue = selectedTerm
     ? payments
         .filter(
@@ -57,7 +67,13 @@ export const AdminDashboard: React.FC = () => {
     : 0;
   const pendingFees = students.reduce(
     (sum, student) =>
-      sum + getOutstandingBalance(student.totalFee, student.amountPaid),
+      sum +
+      (selectedTerm
+        ? getOutstandingBalance(
+            selectedTerm.fee,
+            getTermAmountPaid(payments, student.studentId, selectedTerm),
+          )
+        : 0),
     0,
   );
 
@@ -74,7 +90,7 @@ export const AdminDashboard: React.FC = () => {
       icon: FiUsers,
       label: "Total Students",
       value: totalStudents,
-      change: `${paidStudents} fees paid`,
+      change: selectedTerm ? `${paidStudents} fees paid` : "Select a term",
       gradient: "from-primary/20 to-primary/5",
       iconColor: "text-primary",
     },
@@ -91,16 +107,22 @@ export const AdminDashboard: React.FC = () => {
     {
       icon: FiTrendingUp,
       label: "Fee Completion",
-      value: `${totalStudents > 0 ? Math.round((paidStudents / totalStudents) * 100) : 0}%`,
-      change: `${paidStudents} of ${totalStudents} paid`,
+      value: selectedTerm
+        ? `${totalStudents > 0 ? Math.round((paidStudents / totalStudents) * 100) : 0}%`
+        : "Select a term",
+      change: selectedTerm
+        ? `${paidStudents} of ${totalStudents} paid`
+        : "Choose a term to view completion",
       gradient: "from-accent/20 to-accent/5",
       iconColor: "text-accent",
     },
     {
       icon: FiAlertCircle,
       label: "Pending Fees",
-      value: formatCurrency(pendingFees),
-      change: `${totalStudents - paidStudents} students`,
+      value: selectedTerm ? formatCurrency(pendingFees) : "Select a term",
+      change: selectedTerm
+        ? `${totalStudents - paidStudents} students`
+        : "Choose a term to view pending fees",
       gradient: "from-destructive/20 to-destructive/5",
       iconColor: "text-destructive",
     },
@@ -129,7 +151,7 @@ export const AdminDashboard: React.FC = () => {
             htmlFor="dashboard-term"
             className="block text-sm font-medium text-foreground mb-2"
           >
-            Revenue term
+            Fee term
           </label>
           <select
             id="dashboard-term"
