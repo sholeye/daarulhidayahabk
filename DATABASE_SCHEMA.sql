@@ -80,6 +80,20 @@ create table if not exists public.school_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.academic_terms (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  session text not null,
+  fee numeric(10,2) not null check (fee >= 0),
+  is_current boolean not null default false,
+  starts_on date,
+  ends_on date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (name, session)
+);
+create unique index if not exists academic_terms_one_current_idx on public.academic_terms (is_current) where is_current;
+
 create table if not exists public.school_classes (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -88,6 +102,16 @@ create table if not exists public.school_classes (
   instructor_id uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.class_subjects (
+  id uuid primary key default gen_random_uuid(),
+  class_id uuid not null references public.school_classes(id) on delete cascade,
+  name text not null,
+  name_arabic text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (class_id, name)
 );
 
 create table if not exists public.students (
@@ -148,6 +172,7 @@ create table if not exists public.attendance (
 create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
   student_id text not null references public.students(student_id) on delete cascade,
+  term_id uuid references public.academic_terms(id) on delete set null,
   amount numeric(10,2) not null check (amount >= 0),
   date date not null default current_date,
   term text not null,
@@ -656,7 +681,9 @@ create trigger blog_likes_notify_author
 alter table public.profiles enable row level security;
 alter table public.user_roles enable row level security;
 alter table public.school_settings enable row level security;
+alter table public.academic_terms enable row level security;
 alter table public.school_classes enable row level security;
+alter table public.class_subjects enable row level security;
 alter table public.students enable row level security;
 alter table public.results enable row level security;
 alter table public.attendance enable row level security;
@@ -738,6 +765,14 @@ for all to authenticated
 using (public.has_role(auth.uid(), 'admin'))
 with check (public.has_role(auth.uid(), 'admin'));
 
+create policy "academic_terms_select_authenticated" on public.academic_terms
+for select to authenticated using (true);
+
+create policy "academic_terms_manage_admin" on public.academic_terms
+for all to authenticated
+using (public.has_role(auth.uid(), 'admin'))
+with check (public.has_role(auth.uid(), 'admin'));
+
 create policy "school_classes_select_public" on public.school_classes
 for select
 using (true);
@@ -746,6 +781,20 @@ create policy "school_classes_manage_admin" on public.school_classes
 for all to authenticated
 using (public.has_role(auth.uid(), 'admin'))
 with check (public.has_role(auth.uid(), 'admin'));
+
+create policy "class_subjects_select_authenticated" on public.class_subjects
+for select to authenticated using (true);
+
+create policy "class_subjects_manage_admin" on public.class_subjects
+for all to authenticated
+using (
+  public.has_role(auth.uid(), 'admin')
+  or exists (select 1 from public.school_classes c where c.id = class_subjects.class_id and c.instructor_id = auth.uid())
+)
+with check (
+  public.has_role(auth.uid(), 'admin')
+  or exists (select 1 from public.school_classes c where c.id = class_subjects.class_id and c.instructor_id = auth.uid())
+);
 
 create policy "students_select_admin" on public.students
 for select to authenticated
@@ -1113,6 +1162,7 @@ do $$ begin alter publication supabase_realtime add table public.attendance; exc
 do $$ begin alter publication supabase_realtime add table public.payments; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.notifications; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.school_classes; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.class_subjects; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.quiz_houses; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.quiz_questions; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.quiz_competitions; exception when duplicate_object then null; end $$;
@@ -1140,16 +1190,6 @@ on conflict (id) do update set
   phone = excluded.phone,
   address = excluded.address,
   term_fee = excluded.term_fee;
-
-insert into public.school_classes (name, name_arabic, level)
-values
-  ('Safu Awwal', 'الصف الأول', 'preparatory'),
-  ('Safu Thaniy', 'الصف الثاني', 'preparatory'),
-  ('Safu Thalith', 'الصف الثالث', 'preparatory'),
-  ('Awwal Ibtidai', 'الأول ابتدائي', 'primary'),
-  ('Thaniy Ibtidai', 'الثاني ابتدائي', 'primary'),
-  ('Thalith Ibtidai', 'الثالث ابتدائي', 'primary')
-on conflict (name) do nothing;
 
 insert into public.quiz_houses (name, name_arabic, color)
 values

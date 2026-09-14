@@ -1,5 +1,5 @@
 // User Types
-export type UserRole = 'admin' | 'instructor' | 'learner' | 'parent';
+export type UserRole = "admin" | "instructor" | "learner" | "parent";
 
 // Blog Types
 export interface BlogPost {
@@ -42,13 +42,13 @@ export interface Student {
   address: string;
   phone: string;
   origin: string;
-  sex: 'male' | 'female';
+  sex: "male" | "female";
   guardian: Guardian;
   imageUrl?: string;
   qrCode?: string;
   class: string;
   enrollmentDate: string;
-  feeStatus: 'paid' | 'unpaid' | 'partial';
+  feeStatus: "paid" | "unpaid" | "partial";
   amountPaid: number;
   totalFee: number;
 }
@@ -80,7 +80,7 @@ export interface AttendanceRecord {
   id: string;
   studentId: string;
   date: string;
-  status: 'present' | 'absent' | 'late' | 'excused';
+  status: "present" | "absent" | "late" | "excused";
   checkInTime?: string;
   checkOutTime?: string;
 }
@@ -90,7 +90,7 @@ export interface Announcement {
   id: string;
   title: string;
   content: string;
-  category: 'general' | 'academic' | 'event' | 'urgent';
+  category: "general" | "academic" | "event" | "urgent";
   createdAt: string;
   createdBy: string;
   isActive: boolean;
@@ -102,7 +102,7 @@ export interface SchoolEvent {
   title: string;
   description: string;
   date: string;
-  type: 'ongoing' | 'upcoming' | 'past';
+  type: "ongoing" | "upcoming" | "past";
   location?: string;
 }
 
@@ -110,13 +110,25 @@ export interface SchoolEvent {
 export interface Payment {
   id: string;
   studentId: string;
+  termId?: string;
   amount: number;
   date: string;
   term: string;
   session: string;
   paymentMethod: string;
   receiptNumber: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: "completed" | "pending" | "failed";
+}
+
+export interface AcademicTerm {
+  id: string;
+  name: string;
+  session: string;
+  fee: number;
+  isCurrent: boolean;
+  startsOn?: string;
+  endsOn?: string;
+  createdAt: string;
 }
 
 // Class Types
@@ -124,9 +136,17 @@ export interface SchoolClass {
   id: string;
   name: string;
   nameArabic: string;
-  level: 'preparatory' | 'primary';
+  level: "preparatory" | "primary";
   studentCount: number;
   instructorId?: string;
+}
+
+export interface ClassSubject {
+  id: string;
+  classId: string;
+  name: string;
+  nameArabic: string;
+  createdAt: string;
 }
 
 // Notification Types
@@ -134,7 +154,7 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: "info" | "success" | "warning" | "error";
   isRead: boolean;
   createdAt: string;
   userId: string;

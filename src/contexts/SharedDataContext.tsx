@@ -3,12 +3,33 @@
  * Refetches on auth changes to prevent stale state.
  */
 
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
-import { BlogPost, Announcement, Student, Payment, AttendanceRecord, StudentResult, SchoolClass } from '@/types';
-import * as db from '@/services/supabaseService';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { createNotification, createBulkNotifications } from '@/services/notificationService';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
+  useEffect,
+  useRef,
+} from "react";
+import {
+  BlogPost,
+  Announcement,
+  Student,
+  Payment,
+  AttendanceRecord,
+  StudentResult,
+  SchoolClass,
+  AcademicTerm,
+  ClassSubject,
+} from "@/types";
+import * as db from "@/services/supabaseService";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import {
+  createNotification,
+  createBulkNotifications,
+} from "@/services/notificationService";
 
 interface SharedDataContextType {
   isLoading: boolean;
@@ -22,17 +43,25 @@ interface SharedDataContextType {
 
   announcements: Announcement[];
   addAnnouncement: (ann: Partial<Announcement>) => Promise<void>;
-  updateAnnouncement: (id: string, data: Partial<Announcement>) => Promise<void>;
+  updateAnnouncement: (
+    id: string,
+    data: Partial<Announcement>,
+  ) => Promise<void>;
   deleteAnnouncement: (id: string) => Promise<void>;
   toggleAnnouncementActive: (id: string) => Promise<void>;
 
   students: Student[];
-  addStudent: (student: Partial<Student>, authUserId?: string) => Promise<Student>;
+  addStudent: (
+    student: Partial<Student>,
+    authUserId?: string,
+  ) => Promise<Student>;
   updateStudent: (id: string, data: Partial<Student>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
 
   payments: Payment[];
   addPayment: (payment: Partial<Payment>) => Promise<void>;
+  updatePayment: (id: string, payment: Partial<Payment>) => Promise<void>;
+  deletePayment: (id: string) => Promise<void>;
 
   attendance: AttendanceRecord[];
   setAttendanceRecord: (record: AttendanceRecord) => Promise<void>;
@@ -42,11 +71,33 @@ interface SharedDataContextType {
   addOrUpdateResult: (result: StudentResult) => Promise<void>;
 
   schoolClasses: SchoolClass[];
+  classSubjects: ClassSubject[];
+  addSchoolClass: (schoolClass: {
+    name: string;
+    nameArabic: string;
+    level: SchoolClass["level"];
+  }) => Promise<void>;
+  updateSchoolClass: (id: string, data: Partial<SchoolClass>) => Promise<void>;
+  deleteSchoolClass: (id: string) => Promise<void>;
+  addClassSubject: (subject: Partial<ClassSubject>) => Promise<void>;
+  deleteClassSubject: (id: string) => Promise<void>;
+  academicTerms: AcademicTerm[];
+  currentTerm?: AcademicTerm;
+  addAcademicTerm: (term: Partial<AcademicTerm>) => Promise<void>;
+  updateAcademicTerm: (
+    id: string,
+    data: Partial<AcademicTerm>,
+  ) => Promise<void>;
+  deleteAcademicTerm: (id: string) => Promise<void>;
 }
 
-const SharedDataContext = createContext<SharedDataContextType | undefined>(undefined);
+const SharedDataContext = createContext<SharedDataContextType | undefined>(
+  undefined,
+);
 
-export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -55,39 +106,59 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({ children
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [results, setResults] = useState<StudentResult[]>([]);
   const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
+  const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([]);
+  const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
   const fetchIdRef = useRef(0);
 
   const refreshAll = useCallback(async () => {
     const id = ++fetchIdRef.current;
     setIsLoading(true);
     try {
-      const [s, r, att, pay, ann, bp, cls] = await Promise.all([
-        db.fetchStudents().catch(() => []),
-        db.fetchResults().catch(() => []),
-        db.fetchAttendance().catch(() => []),
-        db.fetchPayments().catch(() => []),
-        db.fetchAnnouncements().catch(() => []),
-        db.fetchBlogPosts().catch(() => []),
-        db.fetchSchoolClasses().catch(() => []),
-      ]);
+      const [s, r, att, pay, ann, bp, cls, terms, subjects] = await Promise.all(
+        [
+          db.fetchStudents().catch(() => []),
+          db.fetchResults().catch(() => []),
+          db.fetchAttendance().catch(() => []),
+          db.fetchPayments().catch(() => []),
+          db.fetchAnnouncements().catch(() => []),
+          db.fetchBlogPosts().catch(() => []),
+          db.fetchSchoolClasses().catch(() => []),
+          db.fetchAcademicTerms().catch(() => []),
+          db.fetchClassSubjects().catch(() => []),
+        ],
+      );
       if (id === fetchIdRef.current) {
-        setStudents(s); setResults(r); setAttendance(att);
-        setPayments(pay); setAnnouncements(ann); setBlogPosts(bp);
+        setStudents(s);
+        setResults(r);
+        setAttendance(att);
+        setPayments(pay);
+        setAnnouncements(ann);
+        setBlogPosts(bp);
         setSchoolClasses(cls);
+        setAcademicTerms(terms);
+        setClassSubjects(subjects);
       }
     } catch (err) {
-      console.error('Failed to fetch data:', err);
+      console.error("Failed to fetch data:", err);
     } finally {
       if (id === fetchIdRef.current) setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { refreshAll(); }, [refreshAll]);
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
 
   // Re-fetch on auth changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "TOKEN_REFRESHED"
+      ) {
         setTimeout(() => refreshAll(), 100);
       }
     });
@@ -98,146 +169,378 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({ children
   // REALTIME SUBSCRIPTIONS - listen to changes and update state instantly
   // ==========================================================================
   useEffect(() => {
-    const channel = supabase.channel('shared-data-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, () => {
-        db.fetchStudents().catch(() => []).then(setStudents);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => {
-        db.fetchAttendance().catch(() => []).then(setAttendance);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        db.fetchPayments().catch(() => []).then(setPayments);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'results' }, () => {
-        db.fetchResults().catch(() => []).then(setResults);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
-        db.fetchAnnouncements().catch(() => []).then(setAnnouncements);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'blog_posts' }, () => {
-        db.fetchBlogPosts().catch(() => []).then(setBlogPosts);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'blog_likes' }, () => {
-        db.fetchBlogPosts().catch(() => []).then(setBlogPosts);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'school_classes' }, () => {
-        db.fetchSchoolClasses().catch(() => []).then(setSchoolClasses);
-      })
+    const channel = supabase
+      .channel("shared-data-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "students" },
+        () => {
+          db.fetchStudents()
+            .catch(() => [])
+            .then(setStudents);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "class_subjects" },
+        () => {
+          db.fetchClassSubjects()
+            .catch(() => [])
+            .then(setClassSubjects);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance" },
+        () => {
+          db.fetchAttendance()
+            .catch(() => [])
+            .then(setAttendance);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments" },
+        () => {
+          db.fetchPayments()
+            .catch(() => [])
+            .then(setPayments);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "results" },
+        () => {
+          db.fetchResults()
+            .catch(() => [])
+            .then(setResults);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "announcements" },
+        () => {
+          db.fetchAnnouncements()
+            .catch(() => [])
+            .then(setAnnouncements);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "blog_posts" },
+        () => {
+          db.fetchBlogPosts()
+            .catch(() => [])
+            .then(setBlogPosts);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "blog_likes" },
+        () => {
+          db.fetchBlogPosts()
+            .catch(() => [])
+            .then(setBlogPosts);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_classes" },
+        () => {
+          db.fetchSchoolClasses()
+            .catch(() => [])
+            .then(setSchoolClasses);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "academic_terms" },
+        () => {
+          db.fetchAcademicTerms()
+            .catch(() => [])
+            .then(setAcademicTerms);
+        },
+      )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Blog
-  const addBlogPost = useCallback(async (post: Partial<BlogPost>, authorId: string) => {
-    const newPost = await db.createBlogPost(post, authorId);
-    setBlogPosts(prev => [newPost, ...prev]);
-  }, []);
+  const addBlogPost = useCallback(
+    async (post: Partial<BlogPost>, authorId: string) => {
+      const newPost = await db.createBlogPost(post, authorId);
+      setBlogPosts((prev) => [newPost, ...prev]);
+    },
+    [],
+  );
 
-  const updateBlogPost = useCallback(async (id: string, data: Partial<BlogPost>) => {
-    await db.updateBlogPostDB(id, data);
-    setBlogPosts(prev => prev.map(p => p.id === id ? { ...p, ...data } as BlogPost : p));
-  }, []);
+  const updateBlogPost = useCallback(
+    async (id: string, data: Partial<BlogPost>) => {
+      await db.updateBlogPostDB(id, data);
+      setBlogPosts((prev) =>
+        prev.map((p) => (p.id === id ? ({ ...p, ...data } as BlogPost) : p)),
+      );
+    },
+    [],
+  );
 
   const deleteBlogPost = useCallback(async (id: string) => {
     await db.deleteBlogPostDB(id);
-    setBlogPosts(prev => prev.filter(p => p.id !== id));
+    setBlogPosts((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const toggleBlogLike = useCallback(async (postId: string, userId: string) => {
-    const liked = await db.toggleBlogLikeDB(postId, userId);
-    setBlogPosts(prev => prev.map(p => {
-      if (p.id !== postId) return p;
-      return { ...p, likes: liked ? [...p.likes, userId] : p.likes.filter(id => id !== userId) };
-    }));
+  const toggleBlogLike = useCallback(
+    async (postId: string, userId: string) => {
+      const liked = await db.toggleBlogLikeDB(postId, userId);
+      setBlogPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          return {
+            ...p,
+            likes: liked
+              ? [...p.likes, userId]
+              : p.likes.filter((id) => id !== userId),
+          };
+        }),
+      );
 
-    if (liked) {
-      const post = blogPosts.find(p => p.id === postId);
-      if (post) {
-        const { data: postData } = await supabase.from('blog_posts').select('author_id').eq('id', postId).single();
-        if (postData?.author_id && postData.author_id !== userId) {
-          createNotification(postData.author_id, 'Post Liked ❤️', `Someone liked your post "${post.title}"`, 'info', '/blog').catch(() => {});
+      if (liked) {
+        const post = blogPosts.find((p) => p.id === postId);
+        if (post) {
+          const { data: postData } = await supabase
+            .from("blog_posts")
+            .select("author_id")
+            .eq("id", postId)
+            .single();
+          if (postData?.author_id && postData.author_id !== userId) {
+            createNotification(
+              postData.author_id,
+              "Post Liked ❤️",
+              `Someone liked your post "${post.title}"`,
+              "info",
+              "/blog",
+            ).catch(() => {});
+          }
         }
       }
-    }
-  }, [blogPosts]);
+    },
+    [blogPosts],
+  );
 
   // Announcements
   const addAnnouncement = useCallback(async (ann: Partial<Announcement>) => {
     const newAnn = await db.createAnnouncement(ann);
-    setAnnouncements(prev => [newAnn, ...prev]);
+    setAnnouncements((prev) => [newAnn, ...prev]);
   }, []);
 
-  const updateAnnouncement = useCallback(async (id: string, data: Partial<Announcement>) => {
-    await db.updateAnnouncementDB(id, data);
-    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...data } as Announcement : a));
-  }, []);
+  const updateAnnouncement = useCallback(
+    async (id: string, data: Partial<Announcement>) => {
+      await db.updateAnnouncementDB(id, data);
+      setAnnouncements((prev) =>
+        prev.map((a) =>
+          a.id === id ? ({ ...a, ...data } as Announcement) : a,
+        ),
+      );
+    },
+    [],
+  );
 
   const deleteAnnouncement = useCallback(async (id: string) => {
     await db.deleteAnnouncementDB(id);
-    setAnnouncements(prev => prev.filter(a => a.id !== id));
+    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
-  const toggleAnnouncementActive = useCallback(async (id: string) => {
-    const ann = announcements.find(a => a.id === id);
-    if (!ann) return;
-    await db.updateAnnouncementDB(id, { isActive: !ann.isActive });
-    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, isActive: !a.isActive } : a));
-  }, [announcements]);
+  const toggleAnnouncementActive = useCallback(
+    async (id: string) => {
+      const ann = announcements.find((a) => a.id === id);
+      if (!ann) return;
+      await db.updateAnnouncementDB(id, { isActive: !ann.isActive });
+      setAnnouncements((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, isActive: !a.isActive } : a)),
+      );
+    },
+    [announcements],
+  );
 
   // Students
-  const addStudent = useCallback(async (student: Partial<Student>, authUserId?: string): Promise<Student> => {
-    const newStudent = await db.createStudent(student, authUserId);
-    setStudents(prev => [newStudent, ...prev]);
-    return newStudent;
-  }, []);
+  const addStudent = useCallback(
+    async (
+      student: Partial<Student>,
+      authUserId?: string,
+    ): Promise<Student> => {
+      const newStudent = await db.createStudent(student, authUserId);
+      setStudents((prev) => [newStudent, ...prev]);
+      return newStudent;
+    },
+    [],
+  );
 
-  const updateStudent = useCallback(async (id: string, data: Partial<Student>) => {
-    await db.updateStudentDB(id, data);
-    setStudents(prev => prev.map(s => s.id === id ? { ...s, ...data } as Student : s));
-  }, []);
+  const updateStudent = useCallback(
+    async (id: string, data: Partial<Student>) => {
+      await db.updateStudentDB(id, data);
+      setStudents((prev) =>
+        prev.map((s) => (s.id === id ? ({ ...s, ...data } as Student) : s)),
+      );
+    },
+    [],
+  );
 
   const deleteStudent = useCallback(async (id: string) => {
     await db.deleteStudentDB(id);
-    setStudents(prev => prev.filter(s => s.id !== id));
+    setStudents((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  const addAcademicTerm = useCallback(
+    async (term: Partial<AcademicTerm>) => {
+      if (term.isCurrent)
+        await Promise.all(
+          academicTerms
+            .filter((t) => t.isCurrent)
+            .map((t) => db.updateAcademicTermDB(t.id, { isCurrent: false })),
+        );
+      const created = await db.createAcademicTerm(term);
+      setAcademicTerms((prev) => [
+        created,
+        ...prev.map((t) => ({
+          ...t,
+          isCurrent: term.isCurrent ? false : t.isCurrent,
+        })),
+      ]);
+    },
+    [academicTerms],
+  );
+
+  const updateAcademicTerm = useCallback(
+    async (id: string, data: Partial<AcademicTerm>) => {
+      const updated = await db.updateAcademicTermDB(id, data);
+      setAcademicTerms((prev) =>
+        prev.map((t) =>
+          data.isCurrent
+            ? { ...t, isCurrent: t.id === id }
+            : t.id === id
+              ? updated
+              : t,
+        ),
+      );
+    },
+    [],
+  );
+
+  const deleteAcademicTerm = useCallback(async (id: string) => {
+    await db.deleteAcademicTermDB(id);
+    setAcademicTerms((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const addSchoolClass = useCallback(
+    async (schoolClass: {
+      name: string;
+      nameArabic: string;
+      level: SchoolClass["level"];
+    }) => {
+      const created = await db.createSchoolClass(schoolClass);
+      setSchoolClasses((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+    },
+    [],
+  );
+
+  const updateSchoolClass = useCallback(
+    async (id: string, data: Partial<SchoolClass>) => {
+      await db.updateSchoolClassDB(id, data);
+      setSchoolClasses((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...data } : item)),
+      );
+    },
+    [],
+  );
+
+  const deleteSchoolClass = useCallback(async (id: string) => {
+    await db.deleteSchoolClassDB(id);
+    setSchoolClasses((prev) => prev.filter((item) => item.id !== id));
+    setClassSubjects((prev) =>
+      prev.filter((subject) => subject.classId !== id),
+    );
+  }, []);
+
+  const addClassSubject = useCallback(
+    async (subject: Partial<ClassSubject>) => {
+      const created = await db.createClassSubject(subject);
+      setClassSubjects((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+    },
+    [],
+  );
+
+  const deleteClassSubject = useCallback(async (id: string) => {
+    await db.deleteClassSubjectDB(id);
+    setClassSubjects((prev) => prev.filter((subject) => subject.id !== id));
   }, []);
 
   // Payments
   const addPayment = useCallback(async (payment: Partial<Payment>) => {
     const newPayment = await db.createPayment(payment);
-    setPayments(prev => [newPayment, ...prev]);
+    setPayments((prev) => [newPayment, ...prev]);
     const freshStudents = await db.fetchStudents();
     setStudents(freshStudents);
 
     if (payment.studentId) {
-      const { data: links } = await supabase.from('parent_students').select('parent_id').eq('student_id', payment.studentId);
+      const { data: links } = await supabase
+        .from("parent_students")
+        .select("parent_id")
+        .eq("student_id", payment.studentId);
       if (links && links.length > 0) {
         createBulkNotifications(
-          links.map(l => l.parent_id),
-          'Fee Payment Recorded 💰',
+          links.map((l) => l.parent_id),
+          "Fee Payment Recorded 💰",
           `A payment of ₦${Number(payment.amount).toLocaleString()} has been recorded for your child.`,
-          'success'
+          "success",
         ).catch(() => {});
       }
     }
   }, []);
 
+  const updatePayment = useCallback(
+    async (id: string, payment: Partial<Payment>) => {
+      const updated = await db.updatePaymentDB(id, payment);
+      setPayments((prev) =>
+        prev.map((item) => (item.id === id ? updated : item)),
+      );
+      if (payment.studentId) setStudents(await db.fetchStudents());
+    },
+    [],
+  );
+
+  const deletePayment = useCallback(async (id: string) => {
+    await db.deletePaymentDB(id);
+    setPayments((prev) => prev.filter((item) => item.id !== id));
+    setStudents(await db.fetchStudents());
+  }, []);
+
   // Attendance
   const setAttendanceRecord = useCallback(async (record: AttendanceRecord) => {
     await db.upsertAttendance(record);
-    setAttendance(prev => {
-      const idx = prev.findIndex(a => a.studentId === record.studentId && a.date === record.date);
-      if (idx >= 0) return prev.map((a, i) => i === idx ? record : a);
+    setAttendance((prev) => {
+      const idx = prev.findIndex(
+        (a) => a.studentId === record.studentId && a.date === record.date,
+      );
+      if (idx >= 0) return prev.map((a, i) => (i === idx ? record : a));
       return [...prev, record];
     });
   }, []);
 
   const bulkSetAttendance = useCallback(async (records: AttendanceRecord[]) => {
     await db.bulkUpsertAttendance(records);
-    setAttendance(prev => {
+    setAttendance((prev) => {
       const updated = [...prev];
-      records.forEach(record => {
-        const idx = updated.findIndex(a => a.studentId === record.studentId && a.date === record.date);
+      records.forEach((record) => {
+        const idx = updated.findIndex(
+          (a) => a.studentId === record.studentId && a.date === record.date,
+        );
         if (idx >= 0) updated[idx] = record;
         else updated.push(record);
       });
@@ -248,24 +551,60 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({ children
   // Results
   const addOrUpdateResult = useCallback(async (result: StudentResult) => {
     await db.upsertResult(result);
-    setResults(prev => {
-      const idx = prev.findIndex(r => r.studentId === result.studentId && r.term === result.term && r.session === result.session);
-      if (idx >= 0) return prev.map((r, i) => i === idx ? result : r);
+    setResults((prev) => {
+      const idx = prev.findIndex(
+        (r) =>
+          r.studentId === result.studentId &&
+          r.term === result.term &&
+          r.session === result.session,
+      );
+      if (idx >= 0) return prev.map((r, i) => (i === idx ? result : r));
       return [...prev, result];
     });
   }, []);
 
   return (
-    <SharedDataContext.Provider value={{
-      isLoading, refreshAll,
-      blogPosts, addBlogPost, updateBlogPost, deleteBlogPost, toggleBlogLike,
-      announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, toggleAnnouncementActive,
-      students, addStudent, updateStudent, deleteStudent,
-      payments, addPayment,
-      attendance, setAttendanceRecord, bulkSetAttendance,
-      results, addOrUpdateResult,
-      schoolClasses,
-    }}>
+    <SharedDataContext.Provider
+      value={{
+        isLoading,
+        refreshAll,
+        blogPosts,
+        addBlogPost,
+        updateBlogPost,
+        deleteBlogPost,
+        toggleBlogLike,
+        announcements,
+        addAnnouncement,
+        updateAnnouncement,
+        deleteAnnouncement,
+        toggleAnnouncementActive,
+        students,
+        addStudent,
+        updateStudent,
+        deleteStudent,
+        payments,
+        addPayment,
+        updatePayment,
+        deletePayment,
+        attendance,
+        setAttendanceRecord,
+        bulkSetAttendance,
+        results,
+        addOrUpdateResult,
+        schoolClasses,
+        classSubjects,
+        addSchoolClass,
+        updateSchoolClass,
+        deleteSchoolClass,
+        addClassSubject,
+        deleteClassSubject,
+        academicTerms,
+        currentTerm: academicTerms.find((term) => term.isCurrent),
+        addAcademicTerm,
+        updateAcademicTerm,
+        deleteAcademicTerm,
+      }}
+    >
       {children}
     </SharedDataContext.Provider>
   );
@@ -273,6 +612,7 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({ children
 
 export const useSharedData = (): SharedDataContextType => {
   const context = useContext(SharedDataContext);
-  if (!context) throw new Error('useSharedData must be used within SharedDataProvider');
+  if (!context)
+    throw new Error("useSharedData must be used within SharedDataProvider");
   return context;
 };

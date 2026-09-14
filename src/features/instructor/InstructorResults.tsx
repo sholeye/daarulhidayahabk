@@ -2,46 +2,67 @@
  * Instructor Results Page - restricted to admin-assigned classes
  */
 
-import React, { useState } from 'react';
-import { FiFileText, FiSave, FiUsers } from 'react-icons/fi';
-import { Student } from '@/types';
-import { useAuth } from '@/features/auth/AuthContext';
-import { useSharedData } from '@/contexts/SharedDataContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { calculateGrade, getGradeRemarks } from '@/utils/helpers';
-import { InlineLoader } from '@/components/ui/page-loader';
-import { motion } from 'framer-motion';
-
-const SUBJECTS = ['hifz', "qira'a", 'hadith', 'lugah', 'seerah', 'adhkar', 'tajweed', 'tawheed', 'fiqh', 'nahw', 'sarf', 'khat'];
+import React, { useState } from "react";
+import { FiFileText, FiSave, FiUsers, FiPlus, FiTrash2 } from "react-icons/fi";
+import { Student } from "@/types";
+import { useAuth } from "@/features/auth/AuthContext";
+import { useSharedData } from "@/contexts/SharedDataContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { calculateGrade, getGradeRemarks } from "@/utils/helpers";
+import { InlineLoader } from "@/components/ui/page-loader";
+import { motion } from "framer-motion";
 
 export const InstructorResults: React.FC = () => {
   const { user } = useAuth();
-  const { students, results, schoolClasses, addOrUpdateResult, isLoading } = useSharedData();
+  const {
+    students,
+    results,
+    schoolClasses,
+    classSubjects,
+    addClassSubject,
+    deleteClassSubject,
+    addOrUpdateResult,
+    isLoading,
+  } = useSharedData();
 
-  const assignedClasses = schoolClasses.filter((schoolClass) => schoolClass.instructorId === user?.id);
+  const assignedClasses = schoolClasses.filter(
+    (schoolClass) => schoolClass.instructorId === user?.id,
+  );
 
-  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [scores, setScores] = useState<Record<string, number>>({});
-  const [teacherRemarks, setTeacherRemarks] = useState('');
-  const [position, setPosition] = useState('1');
+  const [teacherRemarks, setTeacherRemarks] = useState("");
+  const [position, setPosition] = useState("1");
+  const [newSubjectName, setNewSubjectName] = useState("");
 
   React.useEffect(() => {
-    const hasSelectedClass = assignedClasses.some((schoolClass) => schoolClass.name === selectedClass);
+    const hasSelectedClass = assignedClasses.some(
+      (schoolClass) => schoolClass.name === selectedClass,
+    );
     if (!hasSelectedClass) {
-      setSelectedClass(assignedClasses[0]?.name || '');
+      setSelectedClass(assignedClasses[0]?.name || "");
       setSelectedStudent(null);
     }
   }, [assignedClasses, selectedClass]);
 
-  const classStudents = students.filter((student) => student.class === selectedClass);
+  const classStudents = students.filter(
+    (student) => student.class === selectedClass,
+  );
+  const subjectsForClass = classSubjects.filter(
+    (subject) =>
+      subject.classId ===
+      assignedClasses.find((item) => item.name === selectedClass)?.id,
+  );
 
   const handleSelectStudent = (student: Student) => {
     setSelectedStudent(student);
-    const existingResult = results.find((result) => result.studentId === student.studentId);
+    const existingResult = results.find(
+      (result) => result.studentId === student.studentId,
+    );
 
     if (existingResult) {
       const scoreMap: Record<string, number> = {};
@@ -49,47 +70,82 @@ export const InstructorResults: React.FC = () => {
         scoreMap[subject.subject] = subject.score;
       });
       setScores(scoreMap);
-      setTeacherRemarks(existingResult.teacherRemarks || '');
-      setPosition(existingResult.position?.toString() || '1');
+      setTeacherRemarks(existingResult.teacherRemarks || "");
+      setPosition(existingResult.position?.toString() || "1");
       return;
     }
 
     setScores({});
-    setTeacherRemarks('');
-    setPosition('1');
+    setTeacherRemarks("");
+    setPosition("1");
   };
 
   const handleSave = async () => {
     if (!selectedStudent) return;
 
-    const subjects = SUBJECTS.map((subject) => {
-      const score = scores[subject] || 0;
+    if (subjectsForClass.length === 0) {
+      toast.error(
+        "No subjects have been configured for this class. Ask an administrator to add them.",
+      );
+      return;
+    }
+    const subjects = subjectsForClass.map((subjectConfig) => {
+      const score = scores[subjectConfig.name] || 0;
       const grade = calculateGrade(score);
-      return { subject, score, grade, remarks: getGradeRemarks(grade) };
+      return {
+        subject: subjectConfig.name,
+        score,
+        grade,
+        remarks: getGradeRemarks(grade),
+      };
     });
 
-    const totalScore = subjects.reduce((sum, subject) => sum + subject.score, 0);
+    const totalScore = subjects.reduce(
+      (sum, subject) => sum + subject.score,
+      0,
+    );
     const averageScore = totalScore / subjects.length;
 
     try {
       await addOrUpdateResult({
         id: Date.now().toString(),
         studentId: selectedStudent.studentId,
-        term: 'First Term',
-        session: '2024/2025',
+        term: "First Term",
+        session: "2024/2025",
         subjects,
         totalScore,
         averageScore,
         position: parseInt(position, 10),
         teacherRemarks,
-        principalRemarks: '',
-        createdAt: new Date().toISOString().split('T')[0],
+        principalRemarks: "",
+        createdAt: new Date().toISOString().split("T")[0],
       });
-      toast.success('Result saved successfully!');
+      toast.success("Result saved successfully!");
       setSelectedStudent(null);
       setScores({});
     } catch {
-      toast.error('Failed to save result');
+      toast.error("Failed to save result");
+    }
+  };
+
+  const handleAddSubject = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const currentClass = assignedClasses.find(
+      (item) => item.name === selectedClass,
+    );
+    if (!currentClass || !newSubjectName.trim()) return;
+    try {
+      await addClassSubject({
+        classId: currentClass.id,
+        name: newSubjectName.trim(),
+        nameArabic: "",
+      });
+      setNewSubjectName("");
+      toast.success("Subject added to class.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to add subject.",
+      );
     }
   };
 
@@ -99,37 +155,131 @@ export const InstructorResults: React.FC = () => {
     return (
       <div className="text-center py-12 bg-card rounded-2xl border border-border">
         <FiUsers className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">No classes assigned yet. Contact an administrator.</p>
+        <p className="text-muted-foreground">
+          No classes assigned yet. Contact an administrator.
+        </p>
       </div>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-      <div><h1 className="text-2xl sm:text-3xl font-bold text-foreground">Enter Results</h1><p className="text-muted-foreground mt-1">Enter scores for students in your assigned classes</p></div>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6"
+    >
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+          Enter Results
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Enter scores for students in your assigned classes
+        </p>
+      </div>
 
-      <select value={selectedClass} onChange={(event) => { setSelectedClass(event.target.value); setSelectedStudent(null); }} className="h-10 px-4 rounded-lg border border-input bg-background text-foreground">
-        {assignedClasses.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.name}>{schoolClass.name}</option>)}
+      <select
+        value={selectedClass}
+        onChange={(event) => {
+          setSelectedClass(event.target.value);
+          setSelectedStudent(null);
+        }}
+        className="h-10 px-4 rounded-lg border border-input bg-background text-foreground"
+      >
+        {assignedClasses.map((schoolClass) => (
+          <option key={schoolClass.id} value={schoolClass.name}>
+            {schoolClass.name}
+          </option>
+        ))}
       </select>
+
+      <div className="bg-card rounded-2xl border border-border p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h3 className="font-semibold text-foreground">
+              Subjects for this class
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Add or remove subjects assigned to your class.
+            </p>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {subjectsForClass.length} configured
+          </span>
+        </div>
+        <form onSubmit={handleAddSubject} className="flex gap-2 mb-3">
+          <Input
+            value={newSubjectName}
+            onChange={(event) => setNewSubjectName(event.target.value)}
+            placeholder="Subject name"
+          />
+          <Button type="submit">
+            <FiPlus className="w-4 h-4 mr-1" />
+            Add
+          </Button>
+        </form>
+        <div className="flex flex-wrap gap-2">
+          {subjectsForClass.map((subject) => (
+            <span
+              key={subject.id}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm text-foreground"
+            >
+              {subject.name}
+              <button
+                type="button"
+                title={`Remove ${subject.name}`}
+                onClick={() => deleteClassSubject(subject.id)}
+                className="text-destructive"
+              >
+                <FiTrash2 className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card rounded-2xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Students</h3>
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
             {classStudents.map((student) => {
-              const hasResult = results.some((result) => result.studentId === student.studentId);
+              const hasResult = results.some(
+                (result) => result.studentId === student.studentId,
+              );
               return (
-                <button key={student.id} onClick={() => handleSelectStudent(student)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${selectedStudent?.id === student.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedStudent?.id === student.id ? 'bg-primary-foreground/20' : 'bg-gradient-to-br from-primary to-primary/70'}`}>
-                    <span className="text-primary-foreground font-bold">{student.fullName[0]}</span>
+                <button
+                  key={student.id}
+                  onClick={() => handleSelectStudent(student)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${selectedStudent?.id === student.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedStudent?.id === student.id ? "bg-primary-foreground/20" : "bg-gradient-to-br from-primary to-primary/70"}`}
+                  >
+                    <span className="text-primary-foreground font-bold">
+                      {student.fullName[0]}
+                    </span>
                   </div>
-                  <div className="text-left flex-1"><p className="font-medium">{student.fullName}</p><p className={`text-sm ${selectedStudent?.id === student.id ? 'opacity-75' : 'text-muted-foreground'}`}>{student.studentId}</p></div>
-                  {hasResult && <Badge variant="paid" className="text-xs">Done</Badge>}
+                  <div className="text-left flex-1">
+                    <p className="font-medium">{student.fullName}</p>
+                    <p
+                      className={`text-sm ${selectedStudent?.id === student.id ? "opacity-75" : "text-muted-foreground"}`}
+                    >
+                      {student.studentId}
+                    </p>
+                  </div>
+                  {hasResult && (
+                    <Badge variant="paid" className="text-xs">
+                      Done
+                    </Badge>
+                  )}
                 </button>
               );
             })}
-            {classStudents.length === 0 && <p className="text-muted-foreground text-center py-4">No students in this class</p>}
+            {classStudents.length === 0 && (
+              <p className="text-muted-foreground text-center py-4">
+                No students in this class
+              </p>
+            )}
           </div>
         </div>
 
@@ -137,26 +287,86 @@ export const InstructorResults: React.FC = () => {
           {selectedStudent ? (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground">Enter Scores for {selectedStudent.fullName}</h3>
-                <Button onClick={handleSave}><FiSave className="w-4 h-4 mr-2" />Save</Button>
+                <h3 className="font-semibold text-foreground">
+                  Enter Scores for {selectedStudent.fullName}
+                </h3>
+                <Button onClick={handleSave}>
+                  <FiSave className="w-4 h-4 mr-2" />
+                  Save
+                </Button>
               </div>
               <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                {SUBJECTS.map((subject) => {
+                {subjectsForClass.map((subjectConfig) => {
+                  const subject = subjectConfig.name;
                   const score = scores[subject] || 0;
                   const grade = calculateGrade(score);
                   return (
                     <div key={subject} className="flex items-center gap-4">
-                      <div className="flex-1"><label className="text-sm text-muted-foreground">{subject}</label><Input type="number" min="0" max="100" value={scores[subject] || ''} onChange={(event) => setScores({ ...scores, [subject]: parseInt(event.target.value, 10) || 0 })} placeholder="0" /></div>
-                      <Badge variant={grade === 'A+' || grade === 'A' ? 'paid' : grade === 'F' ? 'absent' : 'present'}>{grade}</Badge>
+                      <div className="flex-1">
+                        <label className="text-sm text-muted-foreground">
+                          {subject}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={scores[subject] || ""}
+                          onChange={(event) =>
+                            setScores({
+                              ...scores,
+                              [subject]: parseInt(event.target.value, 10) || 0,
+                            })
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+                      <Badge
+                        variant={
+                          grade === "A+" || grade === "A"
+                            ? "paid"
+                            : grade === "F"
+                              ? "absent"
+                              : "present"
+                        }
+                      >
+                        {grade}
+                      </Badge>
                     </div>
                   );
                 })}
-                <div><label className="text-sm text-muted-foreground">Position in Class</label><Input type="number" min="1" value={position} onChange={(event) => setPosition(event.target.value)} /></div>
-                <div><label className="text-sm text-muted-foreground">Teacher's Remarks</label><textarea value={teacherRemarks} onChange={(event) => setTeacherRemarks(event.target.value)} className="w-full h-20 px-3 py-2 rounded-lg border border-input bg-background text-foreground resize-none" placeholder="Enter remarks..." /></div>
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    Position in Class
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={position}
+                    onChange={(event) => setPosition(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    Teacher's Remarks
+                  </label>
+                  <textarea
+                    value={teacherRemarks}
+                    onChange={(event) => setTeacherRemarks(event.target.value)}
+                    className="w-full h-20 px-3 py-2 rounded-lg border border-input bg-background text-foreground resize-none"
+                    placeholder="Enter remarks..."
+                  />
+                </div>
               </div>
             </>
           ) : (
-            <div className="h-full flex items-center justify-center text-center p-12"><div><FiFileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">Select a student to enter results</p></div></div>
+            <div className="h-full flex items-center justify-center text-center p-12">
+              <div>
+                <FiFileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">
+                  Select a student to enter results
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </div>
