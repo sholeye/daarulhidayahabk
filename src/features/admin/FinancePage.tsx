@@ -2,7 +2,7 @@
  * Finance Management Page - Shared state
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FiDollarSign,
   FiPlus,
@@ -228,31 +228,47 @@ export const FinancePage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [selectedTermId, setSelectedTermId] = useState(currentTerm?.id || "");
 
-  const totalRevenue = payments
-    .filter((payment) => payment.status === "completed")
-    .reduce((sum, payment) => sum + payment.amount, 0);
+  useEffect(() => {
+    if (currentTerm && !selectedTermId) setSelectedTermId(currentTerm.id);
+  }, [currentTerm, selectedTermId]);
+
+  const selectedTerm = academicTerms.find((term) => term.id === selectedTermId);
+
+  const totalRevenue = selectedTerm
+    ? payments
+        .filter(
+          (payment) =>
+            payment.status === "completed" &&
+            (payment.termId === selectedTerm.id ||
+              (!payment.termId &&
+                payment.term === selectedTerm.name &&
+                payment.session === selectedTerm.session)),
+        )
+        .reduce((sum, payment) => sum + payment.amount, 0)
+    : 0;
   const pendingFees = students.reduce(
     (sum, student) =>
       sum +
       getOutstandingBalance(
-        currentTerm?.fee || 0,
-        getTermAmountPaid(payments, student.studentId, currentTerm),
+        selectedTerm?.fee || 0,
+        getTermAmountPaid(payments, student.studentId, selectedTerm),
       ),
     0,
   );
   const paidCount = students.filter(
     (s) =>
       getFeeStatus(
-        getTermAmountPaid(payments, s.studentId, currentTerm),
-        currentTerm?.fee || 0,
+        getTermAmountPaid(payments, s.studentId, selectedTerm),
+        selectedTerm?.fee || 0,
       ) === "paid",
   ).length;
   const unpaidCount = students.filter(
     (s) =>
       getFeeStatus(
-        getTermAmountPaid(payments, s.studentId, currentTerm),
-        currentTerm?.fee || 0,
+        getTermAmountPaid(payments, s.studentId, selectedTerm),
+        selectedTerm?.fee || 0,
       ) === "unpaid",
   ).length;
 
@@ -261,8 +277,8 @@ export const FinancePage: React.FC = () => {
       s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.studentId.toLowerCase().includes(searchQuery.toLowerCase());
     const termStatus = getFeeStatus(
-      getTermAmountPaid(payments, s.studentId, currentTerm),
-      currentTerm?.fee || 0,
+      getTermAmountPaid(payments, s.studentId, selectedTerm),
+      selectedTerm?.fee || 0,
     );
     const matchesStatus = filterStatus === "all" || termStatus === filterStatus;
     return matchesSearch && matchesStatus;
@@ -277,8 +293,10 @@ export const FinancePage: React.FC = () => {
           ? "Payment updated successfully!"
           : "Payment recorded successfully!",
       );
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to record payment.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to record payment.",
+      );
       throw error;
     }
   };
@@ -333,12 +351,35 @@ export const FinancePage: React.FC = () => {
         <p className="text-muted-foreground mt-1">
           Manage fees and payment records
         </p>
-        {currentTerm && (
+        {selectedTerm && (
           <p className="text-sm text-primary mt-2">
-            Current term: {currentTerm.name}, {currentTerm.session} ·{" "}
-            {formatCurrency(currentTerm.fee)}
+            Selected term: {selectedTerm.name}, {selectedTerm.session} ·{" "}
+            {formatCurrency(selectedTerm.fee)}
           </p>
         )}
+      </div>
+
+      <div className="w-full sm:w-80">
+        <label
+          htmlFor="finance-term"
+          className="block text-sm font-medium text-foreground mb-2"
+        >
+          Fee term
+        </label>
+        <select
+          id="finance-term"
+          value={selectedTermId}
+          onChange={(event) => setSelectedTermId(event.target.value)}
+          className="w-full h-10 px-3 rounded-lg border border-input bg-background text-foreground"
+          disabled={academicTerms.length === 0}
+        >
+          <option value="">Select a term</option>
+          {academicTerms.map((term) => (
+            <option key={term.id} value={term.id}>
+              {term.name} · {term.session}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -349,7 +390,7 @@ export const FinancePage: React.FC = () => {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">
-                {formatCurrency(totalRevenue)}
+                {selectedTerm ? formatCurrency(totalRevenue) : "Select a term"}
               </p>
               <p className="text-sm text-muted-foreground">Total Revenue</p>
             </div>
@@ -362,7 +403,7 @@ export const FinancePage: React.FC = () => {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">
-                {formatCurrency(pendingFees)}
+                {selectedTerm ? formatCurrency(pendingFees) : "Select a term"}
               </p>
               <p className="text-sm text-muted-foreground">Pending Fees</p>
             </div>
@@ -471,25 +512,25 @@ export const FinancePage: React.FC = () => {
                     {student.class}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-foreground">
-                    {formatCurrency(currentTerm?.fee || 0)}
+                    {formatCurrency(selectedTerm?.fee || 0)}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-primary">
                     {formatCurrency(
                       getTermAmountPaid(
                         payments,
                         student.studentId,
-                        currentTerm,
+                        selectedTerm,
                       ),
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-destructive">
                     {formatCurrency(
                       getOutstandingBalance(
-                        currentTerm?.fee || 0,
+                        selectedTerm?.fee || 0,
                         getTermAmountPaid(
                           payments,
                           student.studentId,
-                          currentTerm,
+                          selectedTerm,
                         ),
                       ),
                     )}
@@ -501,31 +542,31 @@ export const FinancePage: React.FC = () => {
                           getTermAmountPaid(
                             payments,
                             student.studentId,
-                            currentTerm,
+                            selectedTerm,
                           ),
-                          currentTerm?.fee || 0,
+                          selectedTerm?.fee || 0,
                         ) === "paid"
                           ? "paid"
                           : getFeeStatus(
                                 getTermAmountPaid(
                                   payments,
                                   student.studentId,
-                                  currentTerm,
+                                  selectedTerm,
                                 ),
-                                currentTerm?.fee || 0,
+                                selectedTerm?.fee || 0,
                               ) === "partial"
                             ? "partial"
                             : "unpaid"
                       }
                     >
-                      {currentTerm
+                      {selectedTerm
                         ? getFeeStatus(
                             getTermAmountPaid(
                               payments,
                               student.studentId,
-                              currentTerm,
+                              selectedTerm,
                             ),
-                            currentTerm.fee,
+                            selectedTerm.fee,
                           )
                         : "Not set"}
                     </Badge>
@@ -533,11 +574,11 @@ export const FinancePage: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       {getOutstandingBalance(
-                        currentTerm?.fee || 0,
+                        selectedTerm?.fee || 0,
                         getTermAmountPaid(
                           payments,
                           student.studentId,
-                          currentTerm,
+                          selectedTerm,
                         ),
                       ) > 0 && (
                         <Button
@@ -556,16 +597,20 @@ export const FinancePage: React.FC = () => {
                         const currentPayments = payments.filter(
                           (p) =>
                             p.studentId === student.studentId &&
-                            p.termId === currentTerm?.id &&
+                            selectedTerm &&
+                            (p.termId === selectedTerm.id ||
+                              (!p.termId &&
+                                p.term === selectedTerm.name &&
+                                p.session === selectedTerm.session)) &&
                             p.status === "completed",
                         );
                         const latestPayment = currentPayments[0];
                         const currentBalance = getOutstandingBalance(
-                          currentTerm?.fee || 0,
+                          selectedTerm?.fee || 0,
                           getTermAmountPaid(
                             payments,
                             student.studentId,
-                            currentTerm,
+                            selectedTerm,
                           ),
                         );
                         return (
@@ -575,17 +620,17 @@ export const FinancePage: React.FC = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={async () => {
-                                  if (!currentTerm) return;
+                                  if (!selectedTerm) return;
                                   try {
                                     await addPayment({
                                       studentId: student.studentId,
-                                      termId: currentTerm.id,
+                                      termId: selectedTerm.id,
                                       amount: currentBalance,
                                       date: new Date()
                                         .toISOString()
                                         .split("T")[0],
-                                      term: currentTerm.name,
-                                      session: currentTerm.session,
+                                      term: selectedTerm.name,
+                                      session: selectedTerm.session,
                                       paymentMethod: "Cash",
                                       receiptNumber: `RCP-${Date.now().toString().slice(-6)}`,
                                       status: "completed",
@@ -618,26 +663,29 @@ export const FinancePage: React.FC = () => {
                               </button>
                             )}
                             {latestPayment && (
-                              <button
-                                title="Delete latest payment"
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                title="Remove latest payment"
                                 onClick={async () => {
-                                  if (confirm("Delete this payment record?")) {
+                                  if (confirm("Remove this payment record?")) {
                                     try {
                                       await deletePayment(latestPayment.id);
-                                      toast.success("Payment deleted.");
+                                      toast.success("Payment removed.");
                                     } catch (error) {
                                       toast.error(
                                         error instanceof Error
                                           ? error.message
-                                          : "Failed to delete payment.",
+                                          : "Failed to remove payment.",
                                       );
                                     }
                                   }
                                 }}
-                                className="p-2 hover:bg-destructive/10 rounded-lg text-destructive"
+                                className="text-destructive hover:bg-destructive/10"
                               >
                                 <FiTrash2 className="w-4 h-4" />
-                              </button>
+                                Remove
+                              </Button>
                             )}
                           </>
                         );
@@ -645,14 +693,18 @@ export const FinancePage: React.FC = () => {
                       {getTermAmountPaid(
                         payments,
                         student.studentId,
-                        currentTerm,
+                        selectedTerm,
                       ) > 0 && (
                         <button
                           onClick={() => {
                             const lastPayment = payments.find(
                               (p) =>
                                 p.studentId === student.studentId &&
-                                p.termId === currentTerm?.id,
+                                selectedTerm &&
+                                (p.termId === selectedTerm.id ||
+                                  (!p.termId &&
+                                    p.term === selectedTerm.name &&
+                                    p.session === selectedTerm.session)),
                             );
                             if (lastPayment)
                               generateReceipt(student, lastPayment);
@@ -682,7 +734,7 @@ export const FinancePage: React.FC = () => {
         student={selectedStudent}
         academicTerms={academicTerms}
         payments={payments}
-        currentTerm={currentTerm}
+        currentTerm={selectedTerm}
         editingPayment={editingPayment}
         onSubmit={handlePayment}
       />
