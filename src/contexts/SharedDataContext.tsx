@@ -22,6 +22,7 @@ import {
   SchoolClass,
   AcademicTerm,
   ClassSubject,
+  Book,
 } from "@/types";
 import * as db from "@/services/supabaseService";
 import { supabase } from "@/lib/supabase";
@@ -81,6 +82,11 @@ interface SharedDataContextType {
   deleteSchoolClass: (id: string) => Promise<void>;
   addClassSubject: (subject: Partial<ClassSubject>) => Promise<void>;
   deleteClassSubject: (id: string) => Promise<void>;
+  books: Book[];
+  addBook: (
+    book: Omit<Book, "id" | "createdAt" | "className">,
+  ) => Promise<void>;
+  deleteBook: (book: Book) => Promise<void>;
   academicTerms: AcademicTerm[];
   currentTerm?: AcademicTerm;
   addAcademicTerm: (term: Partial<AcademicTerm>) => Promise<void>;
@@ -108,14 +114,15 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
   const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
   const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubject[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const fetchIdRef = useRef(0);
 
   const refreshAll = useCallback(async () => {
     const id = ++fetchIdRef.current;
     setIsLoading(true);
     try {
-      const [s, r, att, pay, ann, bp, cls, terms, subjects] = await Promise.all(
-        [
+      const [s, r, att, pay, ann, bp, cls, terms, subjects, bookRows] =
+        await Promise.all([
           db.fetchStudents().catch(() => []),
           db.fetchResults().catch(() => []),
           db.fetchAttendance().catch(() => []),
@@ -125,8 +132,8 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
           db.fetchSchoolClasses().catch(() => []),
           db.fetchAcademicTerms().catch(() => []),
           db.fetchClassSubjects().catch(() => []),
-        ],
-      );
+          db.fetchBooks().catch(() => []),
+        ]);
       if (id === fetchIdRef.current) {
         setStudents(s);
         setResults(r);
@@ -137,6 +144,7 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
         setSchoolClasses(cls);
         setAcademicTerms(terms);
         setClassSubjects(subjects);
+        setBooks(bookRows);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -259,6 +267,15 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
           db.fetchAcademicTerms()
             .catch(() => [])
             .then(setAcademicTerms);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "books" },
+        () => {
+          db.fetchBooks()
+            .catch(() => [])
+            .then(setBooks);
         },
       )
       .subscribe();
@@ -481,6 +498,19 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
     setClassSubjects((prev) => prev.filter((subject) => subject.id !== id));
   }, []);
 
+  const addBook = useCallback(
+    async (book: Omit<Book, "id" | "createdAt" | "className">) => {
+      const created = await db.createBook(book);
+      setBooks((prev) => [created, ...prev]);
+    },
+    [],
+  );
+
+  const deleteBook = useCallback(async (book: Book) => {
+    await db.deleteBook(book);
+    setBooks((prev) => prev.filter((item) => item.id !== book.id));
+  }, []);
+
   // Payments
   const addPayment = useCallback(async (payment: Partial<Payment>) => {
     const newPayment = await db.createPayment(payment);
@@ -598,6 +628,9 @@ export const SharedDataProvider: React.FC<{ children: ReactNode }> = ({
         deleteSchoolClass,
         addClassSubject,
         deleteClassSubject,
+        books,
+        addBook,
+        deleteBook,
         academicTerms,
         currentTerm: academicTerms.find((term) => term.isCurrent),
         addAcademicTerm,

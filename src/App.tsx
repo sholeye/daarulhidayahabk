@@ -60,6 +60,8 @@ import { InstructorClasses } from "@/features/instructor/InstructorClasses";
 import { InstructorStudents } from "@/features/instructor/InstructorStudents";
 import { InstructorAttendance } from "@/features/instructor/InstructorAttendance";
 import { InstructorResults } from "@/features/instructor/InstructorResults";
+import { InstructorBooks } from "@/features/instructor/InstructorBooks";
+import { LearnerBooks } from "@/features/learner/LearnerBooks";
 
 // Parent
 import { ParentLayout } from "@/features/parent/ParentLayout";
@@ -142,6 +144,7 @@ const App = () => (
                       element={<InstructorAttendance />}
                     />
                     <Route path="results" element={<InstructorResults />} />
+                    <Route path="books" element={<InstructorBooks />} />
                   </Route>
 
                   {/* Learner Routes */}
@@ -158,6 +161,7 @@ const App = () => (
                     <Route path="attendance" element={<LearnerAttendance />} />
                     <Route path="results" element={<LearnerResults />} />
                     <Route path="fees" element={<LearnerFees />} />
+                    <Route path="books" element={<LearnerBooks />} />
                   </Route>
 
                   {/* Parent Routes */}

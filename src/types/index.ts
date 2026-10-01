@@ -149,6 +149,21 @@ export interface ClassSubject {
   createdAt: string;
 }
 
+// Class Book Types
+export interface Book {
+  id: string;
+  instructorId: string;
+  classId: string;
+  className: string;
+  title: string;
+  description: string;
+  instructions: string;
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  createdAt: string;
+}
+
 // Notification Types
 export interface Notification {
   id: string;

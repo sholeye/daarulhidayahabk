@@ -13,8 +13,75 @@ import {
   AcademicTerm,
   ClassSubject,
   SchoolClass,
+  Book,
 } from "@/types";
 import { getFeeStatus, normalizeCurrency } from "@/utils/helpers";
+
+// =============================================================================
+// BOOKS
+// =============================================================================
+
+export const fetchBooks = async (): Promise<Book[]> => {
+  const { data, error } = await supabase
+    .from("books")
+    .select("*, school_classes!inner(name)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapBookFromDB);
+};
+
+export const uploadBookFile = async (
+  file: File,
+  instructorId: string,
+): Promise<string> => {
+  const filePath = `${instructorId}/${crypto.randomUUID()}.pdf`;
+  const { error } = await supabase.storage
+    .from("books")
+    .upload(filePath, file, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+  if (error) throw error;
+  return filePath;
+};
+
+export const createBook = async (
+  book: Omit<Book, "id" | "createdAt" | "className">,
+): Promise<Book> => {
+  const { data, error } = await supabase
+    .from("books")
+    .insert({
+      instructor_id: book.instructorId,
+      class_id: book.classId,
+      title: book.title,
+      description: book.description,
+      instructions: book.instructions,
+      file_path: book.filePath,
+      file_name: book.fileName,
+      file_size: book.fileSize,
+    })
+    .select("*, school_classes!inner(name)")
+    .single();
+  if (error) throw error;
+  return mapBookFromDB(data);
+};
+
+export const deleteBook = async (book: Book): Promise<void> => {
+  const { error: fileError } = await supabase.storage
+    .from("books")
+    .remove([book.filePath]);
+  if (fileError) throw fileError;
+  const { error } = await supabase.from("books").delete().eq("id", book.id);
+  if (error) throw error;
+};
+
+export const getBookUrl = async (filePath: string): Promise<string> => {
+  const { data, error } = await supabase.storage
+    .from("books")
+    .createSignedUrl(filePath, 60 * 60);
+  if (error) throw error;
+  return data.signedUrl;
+};
 
 // =============================================================================
 // STUDENTS
@@ -647,6 +714,23 @@ function mapAcademicTermFromDB(row: Record<string, unknown>): AcademicTerm {
     isCurrent: Boolean(row.is_current),
     startsOn: row.starts_on as string | undefined,
     endsOn: row.ends_on as string | undefined,
+    createdAt: (row.created_at as string) || "",
+  };
+}
+
+function mapBookFromDB(row: Record<string, unknown>): Book {
+  const schoolClass = row.school_classes as { name?: string } | null;
+  return {
+    id: row.id as string,
+    instructorId: row.instructor_id as string,
+    classId: row.class_id as string,
+    className: schoolClass?.name || "",
+    title: row.title as string,
+    description: (row.description as string) || "",
+    instructions: (row.instructions as string) || "",
+    filePath: row.file_path as string,
+    fileName: row.file_name as string,
+    fileSize: Number(row.file_size) || 0,
     createdAt: (row.created_at as string) || "",
   };
 }
