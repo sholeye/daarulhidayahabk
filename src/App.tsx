@@ -44,6 +44,9 @@ import { AdminQuizPage } from "@/features/admin/AdminQuizPage";
 import { AdminBlogPage } from "@/features/admin/AdminBlogPage";
 import { AssignmentsPage } from "@/features/admin/AssignmentsPage";
 import { ClassesSubjectsPage } from "@/features/admin/ClassesSubjectsPage";
+import { PasswordResetRequestsPage } from "@/features/admin/PasswordResetRequestsPage";
+import { SignupAllowanceKeysPage } from "@/features/admin/SignupAllowanceKeysPage";
+import { MessagingPage } from "@/features/common/MessagingPage";
 
 // Learner //
 import { LearnerLayout } from "@/features/learner/LearnerLayout";
@@ -61,7 +64,9 @@ import { InstructorStudents } from "@/features/instructor/InstructorStudents";
 import { InstructorAttendance } from "@/features/instructor/InstructorAttendance";
 import { InstructorResults } from "@/features/instructor/InstructorResults";
 import { InstructorBooks } from "@/features/instructor/InstructorBooks";
+import { InstructorNotices } from "@/features/instructor/InstructorNotices";
 import { LearnerBooks } from "@/features/learner/LearnerBooks";
+import { LearnerNotices } from "@/features/learner/LearnerNotices";
 
 // Parent
 import { ParentLayout } from "@/features/parent/ParentLayout";
@@ -125,6 +130,15 @@ const App = () => (
                     <Route path="assignments" element={<AssignmentsPage />} />
                     <Route path="classes" element={<ClassesSubjectsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route
+                      path="signup-keys"
+                      element={<SignupAllowanceKeysPage />}
+                    />
+                    <Route
+                      path="password-resets"
+                      element={<PasswordResetRequestsPage />}
+                    />
+                    <Route path="messages" element={<MessagingPage />} />
                   </Route>
 
                   {/* Instructor Routes */}
@@ -145,6 +159,8 @@ const App = () => (
                     />
                     <Route path="results" element={<InstructorResults />} />
                     <Route path="books" element={<InstructorBooks />} />
+                    <Route path="notices" element={<InstructorNotices />} />
+                    <Route path="messages" element={<MessagingPage />} />
                   </Route>
 
                   {/* Learner Routes */}
@@ -162,6 +178,8 @@ const App = () => (
                     <Route path="results" element={<LearnerResults />} />
                     <Route path="fees" element={<LearnerFees />} />
                     <Route path="books" element={<LearnerBooks />} />
+                    <Route path="notices" element={<LearnerNotices />} />
+                    <Route path="messages" element={<MessagingPage />} />
                   </Route>
 
                   {/* Parent Routes */}

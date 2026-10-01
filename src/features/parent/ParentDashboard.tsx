@@ -51,7 +51,7 @@ export const ParentDashboard: React.FC = () => {
       transition={{ duration: 0.4 }}
       className="space-y-6"
     >
-      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground">
+      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-4 sm:p-6 text-primary-foreground">
         <h1 className="text-2xl sm:text-3xl font-bold">
           Assalamu Alaikum, {user?.name?.split(" ")[0] || "Parent"}
         </h1>
@@ -113,7 +113,7 @@ export const ParentDashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="bg-card rounded-2xl border border-border p-6">
+      <div className="min-w-0 bg-card rounded-2xl border border-border p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-lg text-foreground">My Children</h2>
           <Link to="/parent/children">
@@ -147,13 +147,13 @@ export const ParentDashboard: React.FC = () => {
                   key={child.id}
                   className="p-4 rounded-xl bg-muted/50 border border-border"
                 >
-                  <div className="flex items-center gap-4 mb-3">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-3">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center flex-shrink-0">
                       <span className="text-primary-foreground font-bold text-lg">
                         {child.fullName[0]}
                       </span>
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-foreground">
                         {child.fullName}
                       </p>
@@ -162,6 +162,7 @@ export const ParentDashboard: React.FC = () => {
                       </p>
                     </div>
                     <Badge
+                      className="ml-auto max-w-full shrink-0"
                       variant={
                         getFeeStatus(
                           getTermAmountPaid(
@@ -196,7 +197,7 @@ export const ParentDashboard: React.FC = () => {
                         : "Not set"}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 sm:gap-3">
                     <div className="text-center p-2 rounded-lg bg-background">
                       <p className="text-lg font-bold text-foreground">
                         {presentDays}

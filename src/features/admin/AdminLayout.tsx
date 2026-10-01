@@ -20,6 +20,8 @@ import {
   FiAward,
   FiLink,
   FiBookOpen,
+  FiKey,
+  FiMessageCircle,
 } from "react-icons/fi";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useTheme } from "@/features/app/ThemeContext";
@@ -28,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ProfileAvatarUploader } from "@/components/ProfileAvatarUploader";
+import { MessageNavBadge } from "@/components/MessageNavBadge";
 
 export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -50,6 +53,9 @@ export const AdminLayout: React.FC = () => {
     { icon: FiLink, label: "Assignments", path: "/admin/assignments" },
     { icon: FiBookOpen, label: "Classes & Subjects", path: "/admin/classes" },
     { icon: FiSettings, label: t.settings, path: "/admin/settings" },
+    { icon: FiKey, label: "Password Requests", path: "/admin/password-resets" },
+    { icon: FiKey, label: "Signup Keys", path: "/admin/signup-keys" },
+    { icon: FiMessageCircle, label: "Messages", path: "/admin/messages" },
   ];
 
   const handleLogout = async () => {
@@ -63,7 +69,7 @@ export const AdminLayout: React.FC = () => {
       className="min-h-screen bg-background flex w-full"
     >
       <aside
-        className={`fixed inset-y-0 ${isRTL ? "right-0" : "left-0"} z-50 w-72 bg-card border-r border-border transform transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 ${isRTL ? "right-0" : "left-0"} z-50 flex h-dvh w-72 flex-col bg-card border-r border-border transform transition-transform duration-300 ease-out lg:translate-x-0 ${
           sidebarOpen
             ? "translate-x-0"
             : isRTL
@@ -71,7 +77,7 @@ export const AdminLayout: React.FC = () => {
               : "-translate-x-full"
         }`}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="p-6 border-b border-border">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
@@ -88,7 +94,7 @@ export const AdminLayout: React.FC = () => {
             </div>
           </div>
 
-          <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+          <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-3 sm:p-4">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -106,6 +112,7 @@ export const AdminLayout: React.FC = () => {
                     className={`w-5 h-5 ${isActive ? "text-primary" : ""}`}
                   />
                   <span className="font-medium">{item.label}</span>
+                  {item.path === "/admin/messages" && <MessageNavBadge />}
                 </Link>
               );
             })}
@@ -166,7 +173,7 @@ export const AdminLayout: React.FC = () => {
             </button>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-8">
           <Outlet />
         </main>
       </div>

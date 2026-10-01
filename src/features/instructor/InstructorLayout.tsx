@@ -16,6 +16,8 @@ import {
   FiMenu,
   FiX,
   FiEye,
+  FiMessageCircle,
+  FiBell,
 } from "react-icons/fi";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useTheme } from "@/features/app/ThemeContext";
@@ -23,6 +25,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ProfileAvatarUploader } from "@/components/ProfileAvatarUploader";
+import { MessageNavBadge } from "@/components/MessageNavBadge";
 
 export const InstructorLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -43,6 +46,8 @@ export const InstructorLayout: React.FC = () => {
     { icon: FiCalendar, label: t.attendance, path: "/instructor/attendance" },
     { icon: FiFileText, label: t.results, path: "/instructor/results" },
     { icon: FiBookOpen, label: "Book List", path: "/instructor/books" },
+    { icon: FiBell, label: "Class Notices", path: "/instructor/notices" },
+    { icon: FiMessageCircle, label: "Messages", path: "/instructor/messages" },
   ];
 
   const handleLogout = async () => {
@@ -83,7 +88,7 @@ export const InstructorLayout: React.FC = () => {
         />
       )}
       <aside
-        className={`fixed top-0 ${isRTL ? "right-0" : "left-0"} h-full w-64 bg-card border-${isRTL ? "l" : "r"} border-border z-50 transform transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : isRTL ? "translate-x-full" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 ${isRTL ? "right-0" : "left-0"} z-50 flex h-dvh w-64 flex-col border-${isRTL ? "l" : "r"} border-border bg-card transform transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : isRTL ? "translate-x-full" : "-translate-x-full"}`}
       >
         <div className="h-16 px-6 flex items-center justify-between border-b border-border">
           <div>
@@ -99,7 +104,7 @@ export const InstructorLayout: React.FC = () => {
             <FiX className="w-5 h-5" />
           </button>
         </div>
-        <nav className="p-4 space-y-2">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -112,10 +117,11 @@ export const InstructorLayout: React.FC = () => {
             >
               <item.icon className="w-5 h-5" />
               <span className="font-medium">{item.label}</span>
+              {item.path === "/instructor/messages" && <MessageNavBadge />}
             </NavLink>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
+        <div className="shrink-0 border-t border-border bg-card p-3 sm:p-4">
           <div className="flex items-center gap-3 mb-4 px-2">
             <ProfileAvatarUploader sizeClass="w-10 h-10" />
             <div className="flex-1 min-w-0">
@@ -139,7 +145,7 @@ export const InstructorLayout: React.FC = () => {
       <main
         className={`${isRTL ? "lg:mr-64" : "lg:ml-64"} pt-16 lg:pt-0 min-h-screen`}
       >
-        <div className="p-6 lg:p-8">
+        <div className="min-w-0 p-3 sm:p-5 lg:p-8">
           <Outlet />
         </div>
       </main>

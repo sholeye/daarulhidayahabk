@@ -84,7 +84,7 @@ export const LearnerDashboard: React.FC = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
-        <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground">
+        <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-4 sm:p-6 text-primary-foreground">
           <h1 className="text-2xl sm:text-3xl font-bold">
             Assalamu Alaikum, {user?.name?.split(" ")[0] || "Student"}
           </h1>
@@ -108,7 +108,7 @@ export const LearnerDashboard: React.FC = () => {
       transition={{ duration: 0.4 }}
       className="space-y-6"
     >
-      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground">
+      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-4 sm:p-6 text-primary-foreground">
         <h1 className="text-2xl sm:text-3xl font-bold">
           Assalamu Alaikum, {currentStudent.fullName.split(" ")[0]}
         </h1>
@@ -116,11 +116,11 @@ export const LearnerDashboard: React.FC = () => {
           Welcome to your student portal. Here&apos;s your overview.
         </p>
         <div className="mt-4 flex flex-wrap gap-4">
-          <div className="bg-primary-foreground/20 rounded-lg px-4 py-2">
+          <div className="min-w-0 max-w-full bg-primary-foreground/20 rounded-lg px-3 py-2 sm:px-4">
             <span className="text-sm opacity-75">Student ID</span>
             <p className="font-semibold">{currentStudent.studentId}</p>
           </div>
-          <div className="bg-primary-foreground/20 rounded-lg px-4 py-2">
+          <div className="min-w-0 max-w-full bg-primary-foreground/20 rounded-lg px-3 py-2 sm:px-4">
             <span className="text-sm opacity-75">Class</span>
             <p className="font-semibold">{currentStudent.class}</p>
           </div>
