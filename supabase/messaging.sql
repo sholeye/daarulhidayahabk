@@ -23,6 +23,10 @@ begin
     return true;
   end if;
 
+  if public.has_role(_user_a, 'instructor') and public.has_role(_user_b, 'instructor') then
+    return true;
+  end if;
+
   if public.has_role(_user_a, 'admin') and public.has_role(_user_b, 'learner') then
     _admin_id := _user_a;
     _learner_id := _user_b;
@@ -52,6 +56,24 @@ begin
     where s.auth_user_id = _learner_id;
     return _student_id is not null
       and public.is_instructor_for_student(_student_id, _instructor_id);
+  end if;
+
+  if public.has_role(_user_a, 'instructor') and public.has_role(_user_b, 'parent') then
+    return exists (
+      select 1
+      from public.parent_students ps
+      join public.students s on s.student_id = ps.student_id
+      join public.school_classes c on c.name = s.class
+      where ps.parent_id = _user_b and c.instructor_id = _user_a
+    );
+  elsif public.has_role(_user_b, 'instructor') and public.has_role(_user_a, 'parent') then
+    return exists (
+      select 1
+      from public.parent_students ps
+      join public.students s on s.student_id = ps.student_id
+      join public.school_classes c on c.name = s.class
+      where ps.parent_id = _user_a and c.instructor_id = _user_b
+    );
   end if;
 
   return false;
@@ -129,11 +151,6 @@ begin
 end;
 $$;
 
-drop trigger if exists messages_blocked_conversation_guard on public.messages;
-create trigger messages_blocked_conversation_guard
-before insert on public.messages
-for each row execute function public.guard_blocked_conversation_message();
-
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
@@ -150,6 +167,11 @@ create table if not exists public.messages (
   deleted_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+drop trigger if exists messages_blocked_conversation_guard on public.messages;
+create trigger messages_blocked_conversation_guard
+before insert on public.messages
+for each row execute function public.guard_blocked_conversation_message();
 
 alter table public.messages add column if not exists read_at timestamptz;
 alter table public.messages add column if not exists edited_at timestamptz;
@@ -383,7 +405,19 @@ begin
       union
       select distinct p.id, p.full_name, ur.role, p.email, p.avatar_url
       from public.profiles p
-      join public.user_roles ur on ur.user_id = p.id and ur.role = 'admin';
+      join public.user_roles ur on ur.user_id = p.id and ur.role = 'admin'
+      union
+      select distinct p.id, p.full_name, ur.role, p.email, p.avatar_url
+      from public.profiles p
+      join public.user_roles ur on ur.user_id = p.id and ur.role = 'instructor'
+      where p.id <> auth.uid()
+      union
+      select distinct p.id, p.full_name, ur.role, p.email, p.avatar_url
+      from public.parent_students ps
+      join public.students s on s.student_id = ps.student_id
+      join public.school_classes c on c.name = s.class and c.instructor_id = auth.uid()
+      join public.profiles p on p.id = ps.parent_id
+      join public.user_roles ur on ur.user_id = p.id and ur.role = 'parent';
   elsif public.has_role(auth.uid(), 'learner') then
     return query
       select distinct p.id, p.full_name, ur.role, p.email, p.avatar_url
@@ -424,6 +458,73 @@ $$;
 
 revoke all on function public.get_unread_message_count() from public;
 grant execute on function public.get_unread_message_count() to authenticated;
+
+create or replace function public.send_instructor_bulk_message(
+  _audience text,
+  _body text,
+  _excluded_user_ids uuid[] default '{}'
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  _recipient uuid;
+  _conversation_id uuid;
+  _sent_count integer := 0;
+  _text text := trim(coalesce(_body, ''));
+begin
+  if auth.uid() is null or not public.has_role(auth.uid(), 'instructor') then
+    raise exception 'Only instructors can send bulk messages.';
+  end if;
+  if _audience not in ('students', 'instructors', 'all') then
+    raise exception 'Invalid bulk audience.';
+  end if;
+  if length(_text) < 1 or length(_text) > 5000 then
+    raise exception 'Message must be between 1 and 5000 characters.';
+  end if;
+
+  for _recipient in
+    select distinct contact.user_id
+    from public.get_message_contacts() contact
+    where contact.user_id <> auth.uid()
+      and not (contact.user_id = any(coalesce(_excluded_user_ids, '{}'::uuid[])))
+      and (
+        _audience = 'all'
+        or (_audience = 'students' and contact.contact_role = 'learner')
+        or (_audience = 'instructors' and contact.contact_role = 'instructor')
+      )
+  loop
+    insert into public.conversations (participant_one, participant_two)
+    values (auth.uid(), _recipient)
+    on conflict do nothing
+    returning id into _conversation_id;
+
+    if _conversation_id is null then
+      select c.id into _conversation_id
+      from public.conversations c
+      where (c.participant_one = auth.uid() and c.participant_two = _recipient)
+         or (c.participant_two = auth.uid() and c.participant_one = _recipient)
+      limit 1;
+    end if;
+
+    if _conversation_id is not null and not exists (
+      select 1 from public.conversation_user_settings s
+      where s.conversation_id = _conversation_id and s.blocked_at is not null
+    ) then
+      insert into public.messages (conversation_id, sender_id, body)
+      values (_conversation_id, auth.uid(), _text);
+      _sent_count := _sent_count + 1;
+    end if;
+    _conversation_id := null;
+  end loop;
+  return _sent_count;
+end;
+$$;
+
+revoke all on function public.send_instructor_bulk_message(text, text, uuid[]) from public;
+grant execute on function public.send_instructor_bulk_message(text, text, uuid[]) to authenticated;
 
 grant select, insert on public.conversations to authenticated;
 revoke update, delete on public.messages from authenticated;

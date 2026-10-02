@@ -24,6 +24,7 @@ export const LearnerNotices: React.FC = () => {
     (item) => item.name === student?.class,
   );
   const assignedClassId = assignedClass?.id;
+  const studentId = student?.studentId;
   const [notices, setNotices] = useState<Notice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,7 +42,36 @@ export const LearnerNotices: React.FC = () => {
         .order("created_at", { ascending: false });
       if (!active) return;
       if (error) toast.error(error.message || "Unable to load class notices.");
-      else setNotices((data || []) as Notice[]);
+      else {
+        const loaded = (data || []) as Notice[];
+        setNotices(loaded);
+        if (studentId && loaded.length) {
+          const { data: reads } = await supabase
+            .from("instructor_notice_reads")
+            .select("notice_id")
+            .eq("student_id", studentId)
+            .in(
+              "notice_id",
+              loaded.map((notice) => notice.id),
+            );
+          const readIds = new Set((reads || []).map((row) => row.notice_id));
+          const unreadRows = loaded
+            .filter((notice) => !readIds.has(notice.id))
+            .map((notice) => ({
+              notice_id: notice.id,
+              student_id: studentId,
+            }));
+          if (unreadRows.length) {
+            const { error: markError } = await supabase
+              .from("instructor_notice_reads")
+              .upsert(unreadRows, { onConflict: "notice_id,student_id" });
+            if (markError)
+              toast.error(
+                markError.message || "Unable to mark notices as read.",
+              );
+          }
+        }
+      }
       setIsLoading(false);
     };
     void load();
@@ -62,7 +92,7 @@ export const LearnerNotices: React.FC = () => {
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [assignedClassId]);
+  }, [assignedClassId, studentId]);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">

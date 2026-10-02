@@ -123,6 +123,15 @@ export const MessagingPage: React.FC = () => {
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [isContactPickerOpen, setIsContactPickerOpen] = useState(false);
+  const [isBulkComposerOpen, setIsBulkComposerOpen] = useState(false);
+  const [bulkAudience, setBulkAudience] = useState<
+    "students" | "instructors" | "all"
+  >("students");
+  const [bulkBody, setBulkBody] = useState("");
+  const [excludedRecipientIds, setExcludedRecipientIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isBulkSending, setIsBulkSending] = useState(false);
   const [contactCategory, setContactCategory] = useState<
     "all" | "learner" | "instructor" | "admin"
   >("all");
@@ -177,6 +186,12 @@ export const MessagingPage: React.FC = () => {
     (contact) =>
       (contactCategory === "all" || contact.contact_role === contactCategory) &&
       contact.display_name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const bulkRecipients = contacts.filter(
+    (contact) =>
+      bulkAudience === "all" ||
+      (bulkAudience === "students" && contact.contact_role === "learner") ||
+      (bulkAudience === "instructors" && contact.contact_role === "instructor"),
   );
 
   const loadInbox = useCallback(async () => {
@@ -253,9 +268,42 @@ export const MessagingPage: React.FC = () => {
     setIsLoading(false);
   }, [user?.id]);
 
+  const sendBulkMessage = async (event: FormEvent) => {
+    event.preventDefault();
+    if (user?.role !== "instructor" || !bulkBody.trim() || isBulkSending)
+      return;
+    setIsBulkSending(true);
+    const { data, error } = await supabase.rpc("send_instructor_bulk_message", {
+      _audience: bulkAudience,
+      _body: bulkBody.trim(),
+      _excluded_user_ids: Array.from(excludedRecipientIds),
+    });
+    setIsBulkSending(false);
+    if (error) {
+      toast.error(error.message || "Unable to send bulk message.");
+      return;
+    }
+    toast.success(`Message sent to ${Number(data) || 0} recipients.`);
+    setBulkBody("");
+    setExcludedRecipientIds(new Set());
+    setIsBulkComposerOpen(false);
+    await loadInbox();
+  };
+
   useEffect(() => {
     void loadInbox();
   }, [loadInbox]);
+
+  useEffect(() => {
+    const dismissMenus = (event: PointerEvent) => {
+      if ((event.target as HTMLElement).closest("[data-chat-action-menu]"))
+        return;
+      setOpenMessageMenuId(null);
+      setOpenConversationMenuId(null);
+    };
+    document.addEventListener("pointerdown", dismissMenus);
+    return () => document.removeEventListener("pointerdown", dismissMenus);
+  }, []);
 
   useEffect(() => {
     const channel = supabase
@@ -832,8 +880,8 @@ export const MessagingPage: React.FC = () => {
     );
 
   return (
-    <div className="space-y-5">
-      <header>
+    <div className="space-y-3 sm:space-y-5">
+      <header className="hidden sm:block">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
           Messages
         </h1>
@@ -841,7 +889,7 @@ export const MessagingPage: React.FC = () => {
           Private messages with your school contacts.
         </p>
       </header>
-      <section className="grid h-[calc(100dvh-11rem)] min-h-[32rem] grid-cols-1 overflow-hidden rounded-2xl border border-border bg-card shadow-soft md:grid-cols-[minmax(18rem,22rem)_1fr]">
+      <section className="grid h-[calc(100dvh-5.25rem)] min-h-[24rem] grid-cols-1 overflow-visible rounded-2xl border border-border bg-card shadow-soft sm:h-[calc(100dvh-11rem)] sm:min-h-[32rem] sm:overflow-hidden md:grid-cols-[minmax(18rem,22rem)_1fr]">
         <aside
           className={`${activeConversationId ? "hidden md:flex" : "flex"} min-h-0 flex-col border-r border-border`}
         >
@@ -862,20 +910,40 @@ export const MessagingPage: React.FC = () => {
                   {isContactPickerOpen ? "New conversation" : "Chats"}
                 </h2>
               </div>
-              {isContactPickerOpen ? (
+              {isContactPickerOpen || isBulkComposerOpen ? (
                 <span className="text-xs text-muted-foreground">
-                  {visibleContacts.length} people
+                  {isBulkComposerOpen
+                    ? `${bulkRecipients.length} recipients`
+                    : `${visibleContacts.length} people`}
                 </span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsContactPickerOpen(true)}
-                  className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/15"
-                  aria-label="Add new conversation"
-                >
-                  <FiMessageCircle className="h-4 w-4" />
-                  <span>New</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {user?.role === "instructor" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsBulkComposerOpen(true);
+                        setIsContactPickerOpen(false);
+                      }}
+                      className="flex items-center gap-1.5 rounded-full bg-secondary/15 px-3 py-2 text-xs font-medium text-secondary hover:bg-secondary/20"
+                    >
+                      <FiSend className="h-4 w-4" />
+                      <span>Broadcast</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsContactPickerOpen(true);
+                      setIsBulkComposerOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/15"
+                    aria-label="Add new conversation"
+                  >
+                    <FiMessageCircle className="h-4 w-4" />
+                    <span>New</span>
+                  </button>
+                </div>
               )}
             </div>
             <label className="relative block">
@@ -908,7 +976,95 @@ export const MessagingPage: React.FC = () => {
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {isContactPickerOpen ? (
+            {isBulkComposerOpen ? (
+              <form onSubmit={sendBulkMessage} className="space-y-4 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold text-foreground">New broadcast</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsBulkComposerOpen(false)}
+                    className="rounded-lg p-2 hover:bg-muted"
+                    aria-label="Close broadcast"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+                <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+                  Recipients
+                  <select
+                    value={bulkAudience}
+                    onChange={(event) => {
+                      setBulkAudience(
+                        event.target.value as typeof bulkAudience,
+                      );
+                      setExcludedRecipientIds(new Set());
+                    }}
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+                  >
+                    <option value="students">All my students</option>
+                    <option value="instructors">All instructors</option>
+                    <option value="all">All available roles</option>
+                  </select>
+                </label>
+                <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                  <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+                    Exclude specific recipients
+                  </p>
+                  {bulkRecipients.map((contact) => (
+                    <label
+                      key={contact.user_id}
+                      className="flex items-center gap-2 rounded px-1 py-1.5 text-xs text-foreground hover:bg-muted"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={excludedRecipientIds.has(contact.user_id)}
+                        onChange={(event) =>
+                          setExcludedRecipientIds((current) => {
+                            const updated = new Set(current);
+                            if (event.target.checked)
+                              updated.add(contact.user_id);
+                            else updated.delete(contact.user_id);
+                            return updated;
+                          })
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {contact.display_name}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {roleLabel[contact.contact_role]}
+                      </span>
+                    </label>
+                  ))}
+                  {bulkRecipients.length === 0 && (
+                    <p className="px-1 py-2 text-xs text-muted-foreground">
+                      No allowed recipients for this audience.
+                    </p>
+                  )}
+                </div>
+                <Textarea
+                  value={bulkBody}
+                  onChange={(event) => setBulkBody(event.target.value)}
+                  placeholder="Write a message to the selected audience"
+                  maxLength={5000}
+                  rows={5}
+                  className="resize-y"
+                  required
+                />
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={
+                    isBulkSending ||
+                    !bulkBody.trim() ||
+                    bulkRecipients.length === excludedRecipientIds.size
+                  }
+                >
+                  <FiSend />
+                  {isBulkSending ? "Sending..." : "Send broadcast"}
+                </Button>
+              </form>
+            ) : isContactPickerOpen ? (
               visibleContacts.map((contact) => (
                 <button
                   key={contact.user_id}
@@ -1003,7 +1159,10 @@ export const MessagingPage: React.FC = () => {
                         </span>
                       </span>
                     </button>
-                    <div className="relative flex shrink-0 flex-col items-end gap-1 px-3 py-2">
+                    <div
+                      data-chat-action-menu
+                      className="relative flex shrink-0 flex-col items-end gap-1 px-3 py-2"
+                    >
                       <span className="text-[10px] text-muted-foreground">
                         {new Date(conversation.updated_at).toLocaleDateString(
                           [],
@@ -1290,7 +1449,10 @@ export const MessagingPage: React.FC = () => {
                               ))}
                           </div>
                           {!message.deleted_at && (
-                            <div className="absolute right-1 top-1 z-10">
+                            <div
+                              data-chat-action-menu
+                              className="absolute right-1 top-1 z-10"
+                            >
                               <button
                                 type="button"
                                 onClick={() =>

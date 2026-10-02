@@ -202,7 +202,7 @@ export const NotificationBell: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-[22rem] sm:w-96 bg-card rounded-2xl border border-border shadow-strong z-50 overflow-hidden"
+            className="fixed left-2 right-2 top-[4.25rem] z-[70] flex max-h-[calc(100dvh-5rem)] w-auto flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-strong sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[min(70vh,36rem)] sm:w-96"
           >
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h3 className="font-semibold text-foreground">Notifications</h3>
@@ -216,7 +216,7 @@ export const NotificationBell: React.FC = () => {
               )}
             </div>
 
-            <div className="max-h-[70vh] overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {notifications.length === 0 ? (
                 <div className="p-8 text-center">
                   <FiBell className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />

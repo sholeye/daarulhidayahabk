@@ -26,6 +26,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ProfileAvatarUploader } from "@/components/ProfileAvatarUploader";
 import { MessageNavBadge } from "@/components/MessageNavBadge";
+import { NoticeNavBadge } from "@/components/NoticeNavBadge";
 
 export const LearnerLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -112,6 +113,7 @@ export const LearnerLayout: React.FC = () => {
               <item.icon className="w-5 h-5" />
               <span className="font-medium">{item.label}</span>
               {item.path === "/learner/messages" && <MessageNavBadge />}
+              {item.path === "/learner/notices" && <NoticeNavBadge />}
             </NavLink>
           ))}
         </nav>
